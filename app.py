@@ -67,7 +67,7 @@ def get_route_data(coordinates):
         pass
     return None, 0
 
-# --- PREMIUM DESIGNER PDF GENERATOR ---
+# --- PREMIUM DESIGNER PDF GENERATOR (FIXED) ---
 def create_premium_pdf(vehicle_type, total_miles, calculated_toll, locations_data):
     pdf = FPDF()
     pdf.add_page()
@@ -141,8 +141,8 @@ def create_premium_pdf(vehicle_type, total_miles, calculated_toll, locations_dat
         
     pdf.ln(12)
     
-    # 4. Premium Disclaimer & Safety Box
-    pdf.set_fill_color(254, 252, 23BF) # Soft yellow info box background
+    # 4. Premium Disclaimer & Safety Box (FIXED LINE BELOW)
+    pdf.set_fill_color(255, 253, 230) # Fixed standard RGB parameters
     pdf.set_draw_color(217, 119, 6) # Orange border
     pdf.rect(15, pdf.get_y(), 180, 24, 'DF')
     
@@ -260,7 +260,6 @@ else:
                 st.markdown("---")
                 st.markdown("### ⏱️ Logistics Zone Tracking")
                 
-                # Format legacy TXT for Windows notepad just in case
                 dispatch_sheet_text = "======================================\r\n"
                 dispatch_sheet_text += "      DRIVER DISPATCH ITINERARY\r\n"
                 dispatch_sheet_text += "======================================\r\n"
@@ -279,7 +278,6 @@ else:
 
                 st.markdown("---")
                 
-                # Premium Side-by-Side Download Buttons
                 btn_col1, btn_col2 = st.columns(2)
                 with btn_col1:
                     st.download_button(
