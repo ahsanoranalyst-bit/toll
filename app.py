@@ -8,7 +8,7 @@ import pytz
 import requests
 import polyline
 
-st.set_page_config(page_title="Pro Dispatcher | Automated Toll AI", layout="wide")
+st.set_page_config(page_title="Pro Dispatcher | Toll Intelligence", layout="wide")
 
 # Baseline Maximum Tolls for a standard 5-Axle Truck in specific heavy toll states
 STATE_TOLLS_5_AXLE = {
@@ -97,7 +97,7 @@ if not st.session_state['logged_in']:
 
 else:
     st.title("🚛 Automated Route, Zone & Toll Intelligence")
-    st.write("100% Free AI-powered logistics dashboard. Fully automated toll risk and time zone tracking.")
+    st.write("100% Free smart logistics dashboard. Fully automated toll risk and time zone tracking.")
     
     st.sidebar.header("⚙️ Equipment Configuration")
     vehicle_type = st.sidebar.selectbox("Select Vehicle Type (Axles)", list(VEHICLE_MULTIPLIERS.keys()), index=4) 
@@ -118,12 +118,12 @@ else:
         st.rerun()
 
     if st.session_state['calculate_pressed']:
-        geolocator = Nominatim(user_agent="automated_dispatcher_v10")
+        geolocator = Nominatim(user_agent="automated_dispatcher_v11")
         locations_data = []
         coordinates = []
         states_visited = set()
         
-        with st.spinner("AI is analyzing highway geography, vehicle weights, and regional zones..."):
+        with st.spinner("System is analyzing highway geography, vehicle weights, and regional zones..."):
             for loc_name in [origin, waypoint, destination]:
                 if loc_name.strip():
                     try:
@@ -178,11 +178,11 @@ else:
                 
                 if calculated_toll > 0:
                     st.error(f"💰 Automated Dynamic Toll: ${calculated_toll:.2f}")
-                    st.write(f"ℹ️ **AI Analysis:** {toll_reason}")
+                    st.write(f"ℹ️ **System Intelligence:** {toll_reason}")
                     st.info("💡 **Broker Quote Tip:** Factor this automated estimate directly into your flat-rate negotiation strategy.")
                 else:
                     st.success("✅ Automated Dynamic Toll: $0.00")
-                    st.write(f"ℹ️ **AI Analysis:** {toll_reason}")
+                    st.write(f"ℹ️ **System Intelligence:** {toll_reason}")
 
                 st.markdown("---")
                 st.markdown("### ⏱️ Logistics Zone Tracking")
