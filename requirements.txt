@@ -1,8 +1,7 @@
 streamlit
 streamlit-folium
-geopy
+googlemaps
 folium
 timezonefinder
 pytz
-requests
 polyline
