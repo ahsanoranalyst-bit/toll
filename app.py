@@ -8,9 +8,9 @@ import pytz
 import requests
 import polyline
 
-st.set_page_config(page_title="Pro Dispatcher | Toll Intelligence", layout="wide")
+st.set_page_config(page_title="Pro Dispatcher | Toll & Route Intelligence", layout="wide")
 
-# Baseline Maximum Tolls for a standard 5-Axle Truck in specific heavy toll states
+# Baseline Maximum Tolls for specific heavy toll states
 STATE_TOLLS_5_AXLE = {
     "Ohio": 75.00,
     "Indiana": 65.00,
@@ -25,9 +25,9 @@ STATE_TOLLS_5_AXLE = {
     "California": 30.00
 }
 
-# Vehicle Multipliers based on Axles (Matches TollGuru Style automatically)
+# Vehicle Multipliers based on Axles
 VEHICLE_MULTIPLIERS = {
-    "Car, SUV or Pickup truck": 0.15,   # 85% cheaper than standard semi
+    "Car, SUV or Pickup truck": 0.15,
     "Truck - 2 Axles": 0.35,
     "Truck - 3 Axles": 0.55,
     "Truck - 4 Axles": 0.75,
@@ -35,7 +35,7 @@ VEHICLE_MULTIPLIERS = {
     "Truck - 6 Axles": 1.25,
     "Truck - 7 Axles": 1.50,
     "Truck - 8 Axles": 1.75,
-    "Truck - 9 Axles": 2.00,            # Double the price of 5-axle
+    "Truck - 9 Axles": 2.00,
     "Bus": 0.60
 }
 
@@ -96,8 +96,8 @@ if not st.session_state['logged_in']:
                 st.error("Invalid credentials. Access Denied.")
 
 else:
-    st.title("🚛 Automated Route, Zone & Toll Intelligence")
-    st.write("100% Free smart logistics dashboard. Fully automated toll risk and time zone tracking.")
+    st.title("🚛 Route, Zone & Toll Intelligence System")
+    st.write("Smart logistics dashboard. Fully automated toll risk and time zone tracking.")
     
     st.sidebar.header("⚙️ Equipment Configuration")
     vehicle_type = st.sidebar.selectbox("Select Vehicle Type (Axles)", list(VEHICLE_MULTIPLIERS.keys()), index=4) 
@@ -108,7 +108,7 @@ else:
     waypoint = st.sidebar.text_input("2. Pickup Stop (Optional)", "Marion, IN")
     destination = st.sidebar.text_input("3. Final Destination", "Eugene, OR")
 
-    if st.sidebar.button("Generate Automated Dispatch Data"):
+    if st.sidebar.button("Generate Dispatch Data"):
         st.session_state['calculate_pressed'] = True
 
     st.sidebar.markdown("---")
@@ -118,7 +118,7 @@ else:
         st.rerun()
 
     if st.session_state['calculate_pressed']:
-        geolocator = Nominatim(user_agent="automated_dispatcher_v11")
+        geolocator = Nominatim(user_agent="pro_dispatcher_final")
         locations_data = []
         coordinates = []
         states_visited = set()
@@ -147,21 +147,14 @@ else:
             # --- AUTOMATED SMART TOLL ALGORITHM ---
             calculated_toll = 0.0
             
-            # Rule 1: Absolute Local Trip Protection
             if total_miles < 50.0:
                 calculated_toll = 0.0
                 toll_reason = "✅ Local trip under 50 miles detected. Automatically marked as Toll-Free."
             else:
-                # Rule 2: Calculate Base State Tolls
                 base_state_toll = sum(STATE_TOLLS_5_AXLE[s] for s in states_visited if s in STATE_TOLLS_5_AXLE)
-                
-                # Rule 3: Dynamic Distance Scaling Factor
                 distance_factor = min(1.0, total_miles / 600.0)
-                
-                # Rule 4: Vehicle Multiplier Application
                 vehicle_multiplier = VEHICLE_MULTIPLIERS[vehicle_type]
                 
-                # Final Calculation
                 calculated_toll = base_state_toll * distance_factor * vehicle_multiplier
                 
                 if calculated_toll > 0:
@@ -186,9 +179,32 @@ else:
 
                 st.markdown("---")
                 st.markdown("### ⏱️ Logistics Zone Tracking")
+                
+                # Prepare text for Driver Download
+                dispatch_sheet_text = f"======================================\n"
+                dispatch_sheet_text += f"      DRIVER DISPATCH ITINERARY\n"
+                dispatch_sheet_text += f"======================================\n"
+                dispatch_sheet_text += f"DATE: {datetime.now().strftime('%Y-%m-%d')}\n"
+                dispatch_sheet_text += f"EQUIPMENT: {vehicle_type}\n"
+                dispatch_sheet_text += f"TOTAL DISTANCE: {total_miles:,.1f} Miles\n"
+                dispatch_sheet_text += f"ESTIMATED TOLL: ${calculated_toll:.2f}\n\n"
+                dispatch_sheet_text += f"--- ROUTE DETAILS ---\n"
+
                 for idx, data in enumerate(locations_data):
-                    status = "🅿️ Origin" if idx == 0 else "📦 Pickup" if idx == 1 and len(locations_data)==3 else "🚚 Delivery"
-                    st.markdown(f"**{status}:** {data['Query']}  \n➤ `{data['Zone']}` (Local Time: {data['Time']})")
+                    status = "ORIGIN" if idx == 0 else "PICKUP" if idx == 1 and len(locations_data)==3 else "DELIVERY"
+                    st.markdown(f"**{status.capitalize()}:** {data['Query']}  \n➤ `{data['Zone']}` (Local Time: {data['Time']})")
+                    dispatch_sheet_text += f"{idx+1}. {status}: {data['Query']}\n   Zone: {data['Zone']} | Local Time: {data['Time']}\n\n"
+                
+                dispatch_sheet_text += "======================================\n"
+                dispatch_sheet_text += "Drive Safely!"
+
+                st.markdown("---")
+                st.download_button(
+                    label="📄 Download Driver Dispatch Sheet (TXT)",
+                    data=dispatch_sheet_text,
+                    file_name="Driver_Dispatch_Itinerary.txt",
+                    mime="text/plain"
+                )
 
             with col2:
                 m = folium.Map(location=coordinates[0], zoom_start=5)
