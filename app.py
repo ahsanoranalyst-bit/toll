@@ -9,7 +9,7 @@ import requests
 import polyline
 from fpdf import FPDF
 
-st.set_page_config(page_title="Pro Dispatcher | Toll & Route Intelligence", layout="wide")
+st.set_page_config(page_title="Pro Dispatcher | Premium Toll Suite", layout="wide")
 
 # Baseline Maximum Tolls for specific heavy toll states
 STATE_TOLLS_5_AXLE = {
@@ -67,16 +67,105 @@ def get_route_data(coordinates):
         pass
     return None, 0
 
-# Helper function to generate PDF
-def create_pdf(text_data):
+# --- PREMIUM DESIGNER PDF GENERATOR ---
+def create_premium_pdf(vehicle_type, total_miles, calculated_toll, locations_data):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", size=11)
-    # Split by \r\n to process line by line
-    for line in text_data.split('\r\n'):
-        # Clean text for simple FPDF encoding
-        clean_line = line.encode('latin-1', 'replace').decode('latin-1')
-        pdf.cell(200, 7, txt=clean_line, ln=True)
+    pdf.set_margins(15, 15, 15)
+    
+    # 1. Header Banner (Dark Blue Corporate Style)
+    pdf.set_fill_color(26, 54, 93) # Premium Navy Blue
+    pdf.rect(0, 0, 210, 38, 'F')
+    
+    # Header Text
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Arial", style='B', size=20)
+    pdf.cell(0, 5, "LOGISTICS DISPATCH SHEET", ln=True, align='C')
+    pdf.set_font("Arial", size=10)
+    pdf.cell(0, 10, f"Generated on: {datetime.now().strftime('%B %d, %Y | %I:%M %p')}", ln=True, align='C')
+    
+    pdf.ln(15) # Space after header
+    pdf.set_text_color(0, 0, 0) # Reset to black
+    
+    # 2. Summary Block (Grid Table Setup)
+    pdf.set_font("Arial", style='B', size=12)
+    pdf.cell(0, 8, "1. TRIP SUMMARY", ln=True)
+    pdf.set_draw_color(180, 180, 180)
+    pdf.set_line_width(0.3)
+    
+    # Row 1
+    pdf.set_font("Arial", style='B', size=10)
+    pdf.cell(45, 8, " Equipment Type:", border=1)
+    pdf.set_font("Arial", size=10)
+    pdf.cell(50, 8, f" {vehicle_type}", border=1)
+    
+    pdf.set_font("Arial", style='B', size=10)
+    pdf.cell(45, 8, " Total Distance:", border=1)
+    pdf.set_font("Arial", size=10)
+    pdf.cell(40, 8, f" {total_miles:,.1f} Miles", border=1, ln=True)
+    
+    # Row 2 (Toll Highlight Box)
+    pdf.set_font("Arial", style='B', size=10)
+    pdf.cell(45, 10, " Estimated Toll Risk:", border=1)
+    pdf.set_font("Arial", style='B', size=11)
+    if calculated_toll > 0:
+        pdf.set_text_color(180, 0, 0) # Red color for toll alert
+        pdf.cell(135, 10, f" ${calculated_toll:.2f} (Factored for toll highways)", border=1, ln=True)
+    else:
+        pdf.set_text_color(0, 120, 0) # Green for free
+        pdf.cell(135, 10, " $0.00 (Marked as Toll-Free Route)", border=1, ln=True)
+        
+    pdf.set_text_color(0, 0, 0) # Reset text
+    pdf.ln(8)
+    
+    # 3. Itinerary Tracking Table
+    pdf.set_font("Arial", style='B', size=12)
+    pdf.cell(0, 8, "2. ITINERARY & TIME ZONE DATA", ln=True)
+    
+    # Table Header
+    pdf.set_fill_color(240, 244, 248) # Light grey-blue table header
+    pdf.set_font("Arial", style='B', size=10)
+    pdf.cell(30, 8, " Stop Type", border=1, fill=True)
+    pdf.cell(65, 8, " Location Name", border=1, fill=True)
+    pdf.cell(45, 8, " Time Zone ID", border=1, fill=True)
+    pdf.cell(40, 8, " Current Local Time", border=1, fill=True, ln=True)
+    
+    # Table Rows
+    pdf.set_font("Arial", size=10)
+    for idx, data in enumerate(locations_data):
+        status = "Origin" if idx == 0 else "Pickup Stop" if idx == 1 and len(locations_data)==3 else "Final Delivery"
+        pdf.cell(30, 8, f" {status}", border=1)
+        pdf.cell(65, 8, f" {data['Query']}", border=1)
+        pdf.cell(45, 8, f" {data['Zone']}", border=1)
+        pdf.cell(40, 8, f" {data['Time']}", border=1, ln=True)
+        
+    pdf.ln(12)
+    
+    # 4. Premium Disclaimer & Safety Box
+    pdf.set_fill_color(254, 252, 23BF) # Soft yellow info box background
+    pdf.set_draw_color(217, 119, 6) # Orange border
+    pdf.rect(15, pdf.get_y(), 180, 24, 'DF')
+    
+    pdf.set_y(pdf.get_y() + 2)
+    pdf.set_font("Arial", style='B', size=9)
+    pdf.set_text_color(180, 83, 9)
+    pdf.cell(0, 5, "  SAFETY & REIMBURSEMENT NOTICE FOR CARRIERS:", ln=True)
+    pdf.set_font("Arial", size=9)
+    pdf.set_text_color(50, 50, 50)
+    pdf.cell(0, 5, "  - Please verify all timezone shifts before scheduling your pick/drop appointments.", ln=True)
+    pdf.cell(0, 5, "  - Keep physical or electronic copies of all toll transponder logs for seamless clearing.", ln=True)
+    
+    # 5. Sign-off Line
+    pdf.set_y(pdf.get_y() + 15)
+    pdf.set_draw_color(200, 200, 200)
+    pdf.line(15, pdf.get_y() + 10, 75, pdf.get_y() + 10)
+    pdf.line(135, pdf.get_y() + 10, 195, pdf.get_y() + 10)
+    
+    pdf.set_y(pdf.get_y() + 12)
+    pdf.set_font("Arial", size=9)
+    pdf.cell(120, 5, "Authorized Dispatcher Signature")
+    pdf.cell(0, 5, "Carrier / Driver Signature", ln=True)
+    
     return pdf.output(dest='S').encode('latin-1')
 
 # --- DASHBOARD UI ---
@@ -116,7 +205,7 @@ else:
         st.rerun()
 
     if st.session_state['calculate_pressed']:
-        geolocator = Nominatim(user_agent="pro_dispatcher_final")
+        geolocator = Nominatim(user_agent="pro_dispatcher_premium")
         locations_data = []
         coordinates = []
         states_visited = set()
@@ -171,7 +260,7 @@ else:
                 st.markdown("---")
                 st.markdown("### ⏱️ Logistics Zone Tracking")
                 
-                # Using \r\n explicitly so Windows Notepad formats it properly
+                # Format legacy TXT for Windows notepad just in case
                 dispatch_sheet_text = "======================================\r\n"
                 dispatch_sheet_text += "      DRIVER DISPATCH ITINERARY\r\n"
                 dispatch_sheet_text += "======================================\r\n"
@@ -187,24 +276,23 @@ else:
                     dispatch_sheet_text += f"{idx+1}. {status}: {data['Query']}\r\n   Zone: {data['Zone']} | Local Time: {data['Time']}\r\n\r\n"
                 
                 dispatch_sheet_text += "======================================\r\n"
-                dispatch_sheet_text += "Drive Safely!"
 
                 st.markdown("---")
                 
-                # Placing buttons side by side
+                # Premium Side-by-Side Download Buttons
                 btn_col1, btn_col2 = st.columns(2)
                 with btn_col1:
                     st.download_button(
-                        label="📄 Download TXT",
+                        label="📄 Download Clean TXT",
                         data=dispatch_sheet_text,
                         file_name="Driver_Dispatch_Itinerary.txt",
                         mime="text/plain"
                     )
                 with btn_col2:
                     st.download_button(
-                        label="🖨️ Download PDF",
-                        data=create_pdf(dispatch_sheet_text),
-                        file_name="Driver_Dispatch_Itinerary.pdf",
+                        label="👑 Download Premium PDF Sheet",
+                        data=create_premium_pdf(vehicle_type, total_miles, calculated_toll, locations_data),
+                        file_name="Premium_Driver_Dispatch_Sheet.pdf",
                         mime="application/pdf"
                     )
 
