@@ -10,33 +10,18 @@ import polyline
 
 st.set_page_config(page_title="Pro Dispatcher | Smart Toll & Route AI", layout="wide")
 
-# Base Tolls for a standard 5-Axle Truck in heavy toll states
-STATE_TOLLS_5_AXLE = {
-    "Ohio": 75.00,
-    "Indiana": 65.00,
-    "Illinois": 45.00,
-    "Pennsylvania": 150.00,
-    "New York": 90.00,
-    "New Jersey": 60.00,
-    "West Virginia": 25.00,
-    "Kentucky": 15.00,
-    "Florida": 40.00,
-    "Texas": 50.00,
-    "California": 30.00
-}
-
-# Vehicle Multipliers (Scales the toll based on the size of the vehicle)
-VEHICLE_MULTIPLIERS = {
-    "Car, SUV or Pickup truck": 0.2,   # 80% cheaper than 5-axle
-    "Truck - 2 Axles": 0.4,
-    "Truck - 3 Axles": 0.6,
-    "Truck - 4 Axles": 0.8,
-    "Truck - 5 Axles": 1.0,            # Standard Baseline
-    "Truck - 6 Axles": 1.2,
-    "Truck - 7 Axles": 1.4,
-    "Truck - 8 Axles": 1.7,
-    "Truck - 9 Axles": 2.0,            # Double the price of 5-axle
-    "Bus": 0.6
+# Exact Per-Mile Rates based on Vehicle Type
+VEHICLE_RATES = {
+    "Car, SUV or Pickup truck": 0.08,
+    "Truck - 2 Axles": 0.15,
+    "Truck - 3 Axles": 0.25,
+    "Truck - 4 Axles": 0.35,
+    "Truck - 5 Axles": 0.45,   # Standard Baseline
+    "Truck - 6 Axles": 0.55,
+    "Truck - 7 Axles": 0.65,
+    "Truck - 8 Axles": 0.75,
+    "Truck - 9 Axles": 0.85,
+    "Bus": 0.30
 }
 
 if 'logged_in' not in st.session_state:
@@ -61,8 +46,7 @@ def get_time_zone_info(lat, lon):
         if tz_name:
             tz = pytz.timezone(tz_name)
             current_time = datetime.now(tz).strftime('%I:%M %p')
-            zone_number = get_us_zone_name(tz_name)
-            return zone_number, current_time
+            return get_us_zone_name(tz_name), current_time
         return "Unknown", "N/A"
     except:
         return "Unknown", "N/A"
@@ -70,7 +54,6 @@ def get_time_zone_info(lat, lon):
 def get_route_data(coordinates):
     coords_str = ";".join([f"{lon},{lat}" for lat, lon in coordinates])
     url = f"http://router.project-osrm.org/route/v1/driving/{coords_str}?overview=full"
-    
     try:
         response = requests.get(url).json()
         if response.get("code") == "Ok":
@@ -94,19 +77,24 @@ if not st.session_state['logged_in']:
                 st.session_state['logged_in'] = True
                 st.rerun()
             else:
-                st.error("Authentication Failed. Please verify your credentials.")
+                st.error("Authentication Failed.")
 
 else:
-    st.title("🚛 Advanced Route, Toll & Mileage Intelligence")
+    st.title("🚛 Dynamic Mileage, Toll & Zone Intelligence")
     
     st.sidebar.header("⚙️ Vehicle Configuration")
-    vehicle_type = st.sidebar.selectbox("Select Vehicle Type (Axles)", list(VEHICLE_MULTIPLIERS.keys()), index=4) 
+    vehicle_type = st.sidebar.selectbox("Select Vehicle Type", list(VEHICLE_RATES.keys()), index=4) 
+    
+    st.sidebar.markdown("---")
+    st.sidebar.header("🛣️ Toll Route Control")
+    st.sidebar.write("Adjust how much of this route is on Toll Highways:")
+    toll_percentage = st.sidebar.slider("Toll Road Percentage (%)", min_value=0, max_value=100, value=15, step=5)
     
     st.sidebar.markdown("---")
     st.sidebar.header("📍 Itinerary Setup")
-    origin = st.sidebar.text_input("1. Origin (Current Location)", "Cincinnati, OH")
-    waypoint = st.sidebar.text_input("2. Pickup Stop (Optional)", "Marion, IN")
-    destination = st.sidebar.text_input("3. Final Delivery", "Eugene, OR")
+    origin = st.sidebar.text_input("1. Origin", "Cincinnati, OH")
+    waypoint = st.sidebar.text_input("2. Pickup Stop", "Marion, IN")
+    destination = st.sidebar.text_input("3. Final Delivery", "Cincinnati, OH")
 
     if st.sidebar.button("Generate Dispatch Data"):
         st.session_state['calculate_pressed'] = True
@@ -118,12 +106,11 @@ else:
         st.rerun()
 
     if st.session_state['calculate_pressed']:
-        geolocator = Nominatim(user_agent="pro_dispatcher_v6")
+        geolocator = Nominatim(user_agent="pro_dispatcher_v7")
         locations_data = []
         coordinates = []
-        states_visited = set()
         
-        with st.spinner("Analyzing precise highway paths, mileage-based toll scales, and logistics zones..."):
+        with st.spinner("Calculating live mileage, zones, and dynamic toll algorithms..."):
             for loc_name in [origin, waypoint, destination]:
                 if loc_name.strip():
                     try:
@@ -131,13 +118,6 @@ else:
                         if loc:
                             lat, lon = loc.latitude, loc.longitude
                             coordinates.append((lat, lon))
-                            
-                            # Detect state for toll calculation
-                            address = loc.raw.get('address', {})
-                            state = address.get('state')
-                            if state:
-                                states_visited.add(state)
-                                
                             zone_name, current_time = get_time_zone_info(lat, lon)
                             locations_data.append({"Query": loc_name, "Zone": zone_name, "Time": current_time})
                     except:
@@ -146,33 +126,25 @@ else:
         if len(coordinates) >= 2:
             route_geometry, total_miles = get_route_data(coordinates)
             
-            # --- SMART TOLL CALCULATION LOGIC ---
-            # 1. Base Toll for 5-Axle in visited states
-            base_5_axle_toll = sum(STATE_TOLLS_5_AXLE[s] for s in states_visited if s in STATE_TOLLS_5_AXLE)
-            
-            # 2. Mileage Factor (Scales down for very short trips, assuming 300 miles maxes out state tolls)
-            distance_factor = min(1.0, total_miles / 300.0) if total_miles > 0 else 0
-            
-            # 3. Vehicle Multiplier
-            vehicle_multiplier = VEHICLE_MULTIPLIERS[vehicle_type]
-            
-            # Final Hybrid Estimate
-            calculated_toll = base_5_axle_toll * distance_factor * vehicle_multiplier
+            # --- NEW SMART TOLL LOGIC ---
+            rate_per_mile = VEHICLE_RATES[vehicle_type]
+            calculated_toll = total_miles * rate_per_mile * (toll_percentage / 100.0)
             
             col1, col2 = st.columns([1.2, 1.8])
             
             with col1:
                 st.metric(label="🛣️ Total Route Distance", value=f"{total_miles:,.1f} Miles")
-                st.write(f"**Equipment Selected:** `{vehicle_type}`")
+                st.write(f"**Equipment:** `{vehicle_type}`")
                 st.markdown("---")
                 
                 if calculated_toll > 0:
                     st.error(f"💰 Dynamic Estimated Toll: ${calculated_toll:.2f}")
-                    st.write(f"⚠️ **Algorithm Info:** Calculated based on a {total_miles:.1f} mile journey using {vehicle_type} rates in toll zones.")
-                    st.info("💡 **Negotiation Strategy:** Add this AI-calculated estimate to your flat rate when quoting the broker.")
+                    st.markdown(f"**How was this calculated? (For Carrier/Broker)**")
+                    st.code(f"({total_miles:.1f} Miles × ${rate_per_mile:.2f}/mile) × {toll_percentage}% Toll Route = ${calculated_toll:.2f}")
+                    st.info("💡 **Negotiation Strategy:** Use the calculation above to justify the toll cost to your carrier or broker.")
                 else:
                     st.success("✅ Estimated Toll Cost: $0.00")
-                    st.write("This route does not trigger any commercial toll multipliers.")
+                    st.write("Toll percentage is set to 0%. This route is marked as completely toll-free.")
 
                 st.markdown("---")
                 st.markdown("### ⏱️ Logistics Zone Tracking")
@@ -181,7 +153,7 @@ else:
                     st.markdown(f"**{status}:** {data['Query']}  \n➤ `{data['Zone']}` (Local: {data['Time']})")
 
             with col2:
-                m = folium.Map(location=coordinates[0], zoom_start=5)
+                m = folium.Map(location=coordinates[0], zoom_start=6)
                 if route_geometry: 
                     folium.PolyLine(route_geometry, color="red", weight=5, opacity=0.8).add_to(m)
                 else: 
