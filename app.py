@@ -65,7 +65,7 @@ def get_route_data(coordinates):
         pass
     return None, 0
 
-# --- PREMIUM DESIGNER PDF GENERATOR (REMOVED LOCAL TIME) ---
+# --- PREMIUM DESIGNER PDF GENERATOR (REMOVED TIME & SIGNATURES) ---
 def create_premium_pdf(vehicle_type, total_miles, calculated_toll, locations_data):
     pdf = FPDF()
     pdf.add_page()
@@ -73,25 +73,25 @@ def create_premium_pdf(vehicle_type, total_miles, calculated_toll, locations_dat
     
     # 1. Header Banner (Dark Blue Corporate Style)
     pdf.set_fill_color(26, 54, 93) # Premium Navy Blue
-    pdf.rect(0, 0, 210, 38, 'F')
+    pdf.rect(0, 0, 210, 35, 'F')
     
     # Header Text
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Arial", style='B', size=20)
     pdf.cell(0, 5, "LOGISTICS DISPATCH SHEET", ln=True, align='C')
     pdf.set_font("Arial", size=10)
-    pdf.cell(0, 10, f"Generated on: {datetime.now().strftime('%B %d, %Y | %I:%M %p')}", ln=True, align='C')
+    # Fixed: Only showing Date now, completely removed the confusing server time
+    pdf.cell(0, 10, f"Generated on: {datetime.now().strftime('%B %d, %Y')}", ln=True, align='C')
     
     pdf.ln(15) # Space after header
     pdf.set_text_color(0, 0, 0) # Reset to black
     
-    # 2. Summary Block (Grid Table Setup)
+    # 2. Summary Block
     pdf.set_font("Arial", style='B', size=12)
     pdf.cell(0, 8, "1. TRIP SUMMARY", ln=True)
     pdf.set_draw_color(180, 180, 180)
     pdf.set_line_width(0.3)
     
-    # Row 1
     pdf.set_font("Arial", style='B', size=10)
     pdf.cell(45, 8, " Equipment Type:", border=1)
     pdf.set_font("Arial", size=10)
@@ -102,32 +102,29 @@ def create_premium_pdf(vehicle_type, total_miles, calculated_toll, locations_dat
     pdf.set_font("Arial", size=10)
     pdf.cell(40, 8, f" {total_miles:,.1f} Miles", border=1, ln=True)
     
-    # Row 2 (Toll Highlight Box)
     pdf.set_font("Arial", style='B', size=10)
     pdf.cell(45, 10, " Estimated Toll Risk:", border=1)
     pdf.set_font("Arial", style='B', size=11)
     if calculated_toll > 0:
-        pdf.set_text_color(180, 0, 0) # Red color for toll alert
-        pdf.cell(135, 10, f" ${calculated_toll:.2f} (Factored for toll highways)", border=1, ln=True)
+        pdf.set_text_color(180, 0, 0)
+        pdf.cell(135, 10, f" ${calculated_toll:.2f} (Approximate Toll Budget Estimate)", border=1, ln=True)
     else:
-        pdf.set_text_color(0, 120, 0) # Green for free
+        pdf.set_text_color(0, 120, 0)
         pdf.cell(135, 10, " $0.00 (Marked as Toll-Free Route)", border=1, ln=True)
         
-    pdf.set_text_color(0, 0, 0) # Reset text
+    pdf.set_text_color(0, 0, 0)
     pdf.ln(8)
     
-    # 3. Itinerary Tracking Table (3 Columns Only Now)
+    # 3. Itinerary Tracking Table
     pdf.set_font("Arial", style='B', size=12)
     pdf.cell(0, 8, "2. ITINERARY & TIME ZONE DATA", ln=True)
     
-    # Table Header
-    pdf.set_fill_color(240, 244, 248) # Light grey-blue table header
+    pdf.set_fill_color(240, 244, 248)
     pdf.set_font("Arial", style='B', size=10)
     pdf.cell(40, 8, " Stop Type", border=1, fill=True)
     pdf.cell(85, 8, " Location Name", border=1, fill=True)
     pdf.cell(55, 8, " Time Zone ID", border=1, fill=True, ln=True)
     
-    # Table Rows
     pdf.set_font("Arial", size=10)
     for idx, data in enumerate(locations_data):
         status = "Origin" if idx == 0 else "Pickup Stop" if idx == 1 and len(locations_data)==3 else "Final Delivery"
@@ -139,7 +136,7 @@ def create_premium_pdf(vehicle_type, total_miles, calculated_toll, locations_dat
     
     # 4. Premium Disclaimer & Safety Box
     pdf.set_fill_color(255, 253, 230) 
-    pdf.set_draw_color(217, 119, 6) # Orange border
+    pdf.set_draw_color(217, 119, 6)
     pdf.rect(15, pdf.get_y(), 180, 24, 'DF')
     
     pdf.set_y(pdf.get_y() + 2)
@@ -150,17 +147,6 @@ def create_premium_pdf(vehicle_type, total_miles, calculated_toll, locations_dat
     pdf.set_text_color(50, 50, 50)
     pdf.cell(0, 5, "  - Please verify all timezone shifts before scheduling your pick/drop appointments.", ln=True)
     pdf.cell(0, 5, "  - Keep physical or electronic copies of all toll transponder logs for seamless clearing.", ln=True)
-    
-    # 5. Sign-off Line
-    pdf.set_y(pdf.get_y() + 15)
-    pdf.set_draw_color(200, 200, 200)
-    pdf.line(15, pdf.get_y() + 10, 75, pdf.get_y() + 10)
-    pdf.line(135, pdf.get_y() + 10, 195, pdf.get_y() + 10)
-    
-    pdf.set_y(pdf.get_y() + 12)
-    pdf.set_font("Arial", size=9)
-    pdf.cell(120, 5, "Authorized Dispatcher Signature")
-    pdf.cell(0, 5, "Carrier / Driver Signature", ln=True)
     
     return pdf.output(dest='S').encode('latin-1')
 
@@ -256,7 +242,6 @@ else:
                 st.markdown("---")
                 st.markdown("### ⏱️ Logistics Zone Tracking")
                 
-                # Format TXT file cleanly without time data
                 dispatch_sheet_text = "======================================\r\n"
                 dispatch_sheet_text += "      DRIVER DISPATCH ITINERARY\r\n"
                 dispatch_sheet_text += "======================================\r\n"
