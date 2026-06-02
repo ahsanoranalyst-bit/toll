@@ -41,17 +41,15 @@ def get_us_zone_name(tz_string):
     elif "Honolulu" in tz_string: return "Zone 7 (HST)"
     else: return f"Unknown Zone"
 
-def get_time_zone_info(lat, lon):
+def get_time_zone_only(lat, lon):
     try:
         tf = TimezoneFinder()
         tz_name = tf.timezone_at(lng=lon, lat=lat)
         if tz_name:
-            tz = pytz.timezone(tz_name)
-            current_time = datetime.now(tz).strftime('%I:%M %p')
-            return get_us_zone_name(tz_name), current_time
-        return "Unknown", "N/A"
+            return get_us_zone_name(tz_name)
+        return "Unknown"
     except:
-        return "Unknown", "N/A"
+        return "Unknown"
 
 def get_route_data(coordinates):
     coords_str = ";".join([f"{lon},{lat}" for lat, lon in coordinates])
@@ -67,7 +65,7 @@ def get_route_data(coordinates):
         pass
     return None, 0
 
-# --- PREMIUM DESIGNER PDF GENERATOR (FIXED) ---
+# --- PREMIUM DESIGNER PDF GENERATOR (REMOVED LOCAL TIME) ---
 def create_premium_pdf(vehicle_type, total_miles, calculated_toll, locations_data):
     pdf = FPDF()
     pdf.add_page()
@@ -118,31 +116,29 @@ def create_premium_pdf(vehicle_type, total_miles, calculated_toll, locations_dat
     pdf.set_text_color(0, 0, 0) # Reset text
     pdf.ln(8)
     
-    # 3. Itinerary Tracking Table
+    # 3. Itinerary Tracking Table (3 Columns Only Now)
     pdf.set_font("Arial", style='B', size=12)
     pdf.cell(0, 8, "2. ITINERARY & TIME ZONE DATA", ln=True)
     
     # Table Header
     pdf.set_fill_color(240, 244, 248) # Light grey-blue table header
     pdf.set_font("Arial", style='B', size=10)
-    pdf.cell(30, 8, " Stop Type", border=1, fill=True)
-    pdf.cell(65, 8, " Location Name", border=1, fill=True)
-    pdf.cell(45, 8, " Time Zone ID", border=1, fill=True)
-    pdf.cell(40, 8, " Current Local Time", border=1, fill=True, ln=True)
+    pdf.cell(40, 8, " Stop Type", border=1, fill=True)
+    pdf.cell(85, 8, " Location Name", border=1, fill=True)
+    pdf.cell(55, 8, " Time Zone ID", border=1, fill=True, ln=True)
     
     # Table Rows
     pdf.set_font("Arial", size=10)
     for idx, data in enumerate(locations_data):
         status = "Origin" if idx == 0 else "Pickup Stop" if idx == 1 and len(locations_data)==3 else "Final Delivery"
-        pdf.cell(30, 8, f" {status}", border=1)
-        pdf.cell(65, 8, f" {data['Query']}", border=1)
-        pdf.cell(45, 8, f" {data['Zone']}", border=1)
-        pdf.cell(40, 8, f" {data['Time']}", border=1, ln=True)
+        pdf.cell(40, 8, f" {status}", border=1)
+        pdf.cell(85, 8, f" {data['Query']}", border=1)
+        pdf.cell(55, 8, f" {data['Zone']}", border=1, ln=True)
         
     pdf.ln(12)
     
-    # 4. Premium Disclaimer & Safety Box (FIXED LINE BELOW)
-    pdf.set_fill_color(255, 253, 230) # Fixed standard RGB parameters
+    # 4. Premium Disclaimer & Safety Box
+    pdf.set_fill_color(255, 253, 230) 
     pdf.set_draw_color(217, 119, 6) # Orange border
     pdf.rect(15, pdf.get_y(), 180, 24, 'DF')
     
@@ -205,7 +201,7 @@ else:
         st.rerun()
 
     if st.session_state['calculate_pressed']:
-        geolocator = Nominatim(user_agent="pro_dispatcher_premium")
+        geolocator = Nominatim(user_agent="pro_dispatcher_premium_final")
         locations_data = []
         coordinates = []
         states_visited = set()
@@ -220,8 +216,8 @@ else:
                             coordinates.append((lat, lon))
                             state = loc.raw.get('address', {}).get('state')
                             if state: states_visited.add(state)
-                            zone_name, current_time = get_time_zone_info(lat, lon)
-                            locations_data.append({"Query": loc_name, "Zone": zone_name, "Time": current_time})
+                            zone_name = get_time_zone_only(lat, lon)
+                            locations_data.append({"Query": loc_name, "Zone": zone_name})
                     except:
                         pass
 
@@ -260,6 +256,7 @@ else:
                 st.markdown("---")
                 st.markdown("### ⏱️ Logistics Zone Tracking")
                 
+                # Format TXT file cleanly without time data
                 dispatch_sheet_text = "======================================\r\n"
                 dispatch_sheet_text += "      DRIVER DISPATCH ITINERARY\r\n"
                 dispatch_sheet_text += "======================================\r\n"
@@ -271,8 +268,8 @@ else:
 
                 for idx, data in enumerate(locations_data):
                     status = "ORIGIN" if idx == 0 else "PICKUP" if idx == 1 and len(locations_data)==3 else "DELIVERY"
-                    st.markdown(f"**{status.capitalize()}:** {data['Query']}  \n➤ `{data['Zone']}` (Local Time: {data['Time']})")
-                    dispatch_sheet_text += f"{idx+1}. {status}: {data['Query']}\r\n   Zone: {data['Zone']} | Local Time: {data['Time']}\r\n\r\n"
+                    st.markdown(f"**{status.capitalize()}:** {data['Query']}  \n➤ `{data['Zone']}`")
+                    dispatch_sheet_text += f"{idx+1}. {status}: {data['Query']}\r\n   Zone: {data['Zone']}\r\n\r\n"
                 
                 dispatch_sheet_text += "======================================\r\n"
 
